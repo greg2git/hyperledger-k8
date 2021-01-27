@@ -1,7 +1,9 @@
-FROM raft/hl-fabric-tools:1.4.1
+# docker build .
+FROM hyperledger/fabric-tools:2.2.1
 
-# install yq via pip
-RUN curl "https://bootstrap.pypa.io/get-pip.py" -o "get-pip.py" && \
-    python get-pip.py && \
-    pip install yq
-    
+RUN apk --no-cache add tar gzip curl
+
+RUN apk add --update --no-cache python3 && ln -sf python /usr/bin/python
+RUN python3 -m ensurepip
+
+RUN pip3 install yq

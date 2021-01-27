@@ -16,21 +16,22 @@ spec:
 
   #orderer volumes
   {{- range $i, $org := .Values.OrdererOrgs }}
-  - name: hlf-orderer--{{ $org.Name | lower }}
-    persistentVolumeClaim:
-      claimName: hlf-orderer--{{ $org.Name | lower }}
   - name: hlf-ca--{{ $org.Name | lower }}
     persistentVolumeClaim:
       claimName: hlf-ca--{{ $org.Name | lower }}
-  {{- range $i, $host := $org.Specs }}
 
+  - name: hlf-orderer--{{ $org.Name | lower }}
+    persistentVolumeClaim:
+      claimName: hlf-orderer--{{ $org.Name | lower }}
+
+  {{- range $i, $host := $org.Specs }}
   - name: hlf-orderer--{{ $org.Name | lower }}--{{ $host.Hostname | lower }}
     persistentVolumeClaim:
       claimName: hlf-orderer--{{ $org.Name | lower }}--{{ $host.Hostname | lower }}
 
   {{- end }} {{- /* orderer hosts */ -}}{{""}}
   {{- end }} {{- /* orderer orgs */ -}}{{""}}
-  
+
   #peer org volumes
   {{- range $i, $org := .Values.PeerOrgs }}
   - name: hlf-peer-org--{{ $org.Name | lower }}
@@ -62,7 +63,7 @@ spec:
       items:
       - key: configtx.yaml
         path: configtx/configtx.yaml
-  
+
   templates:
   - name: artifacts
     steps:
@@ -72,11 +73,11 @@ spec:
 {{- range $i, $ordererOrg := .Values.OrdererOrgs  }}
 
 {{- if or $vars.firstStep (not $.Values.flow.orderer.parallel) }}
-    - 
+    -
 {{- end }}
       - name: orderer--{{ $ordererOrg.Name | lower }}
         template: orderer--{{ $ordererOrg.Name  | lower }}
-      
+
 {{- $_ := set $vars "firstStep" false }}
 {{- end }} {{- /* orderers */ -}}{{""}}
 
@@ -84,11 +85,11 @@ spec:
 {{- range $i, $org := .Values.PeerOrgs  }}
 
 {{- if or $vars.secondStep (not $.Values.flow.peerorgs.parallel) }}
-    - 
+    -
 {{- end }}
       - name: peer-org--{{ $org.Name | lower }}
         template: peer-org--{{ $org.Name  | lower }}
-      
+
 {{- $_ := set $vars "secondStep" false }}
 {{- end }} {{- /* peer orgs */ -}}{{""}}
 
@@ -96,32 +97,34 @@ spec:
 # third level: generate artifacts
 {{- $_ := set $vars "thirdStep" true }}
 
-    - 
+    -
       - name: generate-channel-artifacts
         template: generate-channel-artifacts
-      
+
 {{- $_ := set $vars "thirdStep" false }}
 
 
 {{- range $i, $ordererOrg := .Values.OrdererOrgs  }}
   - name: orderer--{{ $ordererOrg.Name | lower }}
-    steps: 
-    - - name: register-orderer--{{ $ordererOrg.Name  | lower }}
-        template: register-orderer--{{ $ordererOrg.Name  | lower }}
-    - - name: get-orderer-ca-cert--{{ $ordererOrg.Name | lower }}
-        template: get-orderer-ca-cert--{{ $ordererOrg.Name  | lower }}
-        {{- range $i, $host := $ordererOrg.Specs }}
-    - - name: orderer-host--{{ $ordererOrg.Name  | lower }}--{{ $host.Hostname  | lower }}
-        template: orderer-host--{{ $ordererOrg.Name  | lower }}--{{ $host.Hostname  | lower }}
-        {{- end }} {{- /* orderers hosts */ -}}{{""}}
+    steps:
+    - - name: register-orderer-identies--{{ $ordererOrg.Name  | lower }}
+        template: register-orderer-identies--{{ $ordererOrg.Name  | lower }}
+{{/*    - - name: get-orderer-ca-cert--{{ $ordererOrg.Name | lower }}*/}}
+{{/*        template: get-orderer-ca-cert--{{ $ordererOrg.Name  | lower }}*/}}
+    - - name: generate-orderer-admin-ca-cert--{{ $ordererOrg.Name | lower }}
+        template: generate-orderer-admin-ca-cert--{{ $ordererOrg.Name | lower }}
+    {{- range $i, $host := $ordererOrg.Specs }}
+    - - name: generate-orderer-host--{{ $ordererOrg.Name  | lower }}--{{ $host.Hostname  | lower }}
+        template: generate-orderer-host--{{ $ordererOrg.Name  | lower }}--{{ $host.Hostname  | lower }}
+    {{- end }} {{- /* orderers hosts */ -}}{{""}}
 {{- end }} {{- /* orderers */ -}}{{""}}
 
 {{- range $i, $ordererOrg := .Values.OrdererOrgs  }}
 {{- range $i, $host := $ordererOrg.Specs }}
-  - name: orderer-host--{{ $ordererOrg.Name  | lower }}--{{ $host.Hostname  | lower }}
-    steps: 
-    - -  name: orderer-host-generate-certs--{{ $ordererOrg.Name | lower }}--{{ $host.Hostname | lower }}
-         template: orderer-host-generate-certs--{{ $ordererOrg.Name | lower }}--{{ $host.Hostname | lower }}
+  - name: generate-orderer-host--{{ $ordererOrg.Name  | lower }}--{{ $host.Hostname  | lower }}
+    steps:
+    - -  name: generate-orderer-host-generate-certs--{{ $ordererOrg.Name | lower }}--{{ $host.Hostname | lower }}
+         template: generate-orderer-host-generate-certs--{{ $ordererOrg.Name | lower }}--{{ $host.Hostname | lower }}
 {{- end }} {{- /* orderers hosts */ -}}{{""}}
 {{- end }} {{- /* orderers */ -}}{{""}}
 
@@ -129,9 +132,9 @@ spec:
 
 {{- range $i, $org := .Values.PeerOrgs  }}
   - name: peer-org--{{ $org.Name | lower }}
-    steps: 
-    - - name: register-peer-org--{{ $org.Name  | lower }}
-        template: register-peer-org--{{ $org.Name  | lower }}
+    steps:
+    - - name: register-peer-org-identities--{{ $org.Name  | lower }}
+        template: register-peer-org-identities--{{ $org.Name  | lower }}
     - - name: get-peer-org-ca-cert--{{ $org.Name | lower }}
         template: get-peer-org-ca-cert--{{ $org.Name  | lower }}
         {{- range $peerIndex := until ($org.Template.Count | int) }}
@@ -145,71 +148,68 @@ spec:
 {{- range $peerIndex := until ($org.Template.Count | int) }}
 {{- $peer := (printf "peer%s" ($peerIndex | toString)) }}
   - name: peer--{{ $org.Name  | lower }}--{{ $peer  | lower }}
-    steps: 
+    steps:
     - - name: peer-generate-certs--{{ $org.Name | lower }}--{{ $peer | lower }}
         template: peer-generate-certs--{{ $org.Name | lower }}--{{ $peer | lower }}
 {{- end }} {{- /* peers */ -}}{{""}}
 {{- end }} {{- /* peer  orgs */ -}}{{""}}
 
-
-
-
-
-
 # leaf register orderer identity templates
 {{- range $i, $ordererOrg := .Values.OrdererOrgs }}
-  - name: register-orderer--{{ $ordererOrg.Name | lower }}
+  - name: register-orderer-identies--{{ $ordererOrg.Name | lower }}
     inputs:
     retryStrategy:
       limit: {{ $.Values.retryCount }}
     script:
-      image: hyperledger/fabric-tools:{{ $.Values.hyperledgerVersion }}
-      #image: hyperledger/fabric-tools:1.4.1
+      image: c0deh0use/fabric-ca-client-tools:{{ $.Values.FabricCaClientVersion }}
       command: [sh]
       source: |
-          if [ ! "$(ls -A /hlf-orderer--{{ $ordererOrg.Name | lower }})" ]; then
-            echo "Installing required components for fabric-ca-client"
-            apt-get update && apt-get install -y netcat jq \
-            && apt-get install -y curl && rm -rf /var/cache/apt
-            curl -o /tmp/fabric-ca-client.tar.gz https://nexus.hyperledger.org/content/repositories/releases/org/hyperledger/fabric-ca/hyperledger-fabric-ca/linux-amd64-1.4.3/hyperledger-fabric-ca-linux-amd64-1.4.3.tar.gz && tar -xzvf /tmp/fabric-ca-client.tar.gz -C /tmp && cp /tmp/bin/fabric-ca-client /usr/local/bin
-            chmod +x /usr/local/bin/fabric-ca-client
-            FABRIC_CA_DYNAMIC_LINK=false
-            if [ "\$FABRIC_CA_DYNAMIC_LINK" = "true" ]; then apt-get install -y libltdl-dev; fi
-            echo "Enrolling with http://"$CA_ADMIN_USER_PASS"@"$CA_HOST":7054"    
-            fabric-ca-client enroll -d -u http://$CA_ADMIN_USER_PASS@$CA_HOST:7054
+          if [ ! -f "/{{ $ordererOrg.Domain }}/{{ printf "orderers.%s.registred" $ordererOrg.Domain }}" ]; then
 
-            {{- range $i,$host := $ordererOrg.Specs }}
-              echo "Registering $host.Hostname with $CA_HOST"
-              export ORDERER_NAME={{ $host.Hostname }}-{{ $ordererOrg.Name }}
-              export ORDERER_PASS={{ $host.Hostname }}-{{ $ordererOrg.Name }}pw
-              fabric-ca-client register -d --id.name $ORDERER_NAME --id.secret $ORDERER_PASS --id.type orderer
+            echo "--- Enrolling with https://$CA_ADMIN_USER_PASS@$CA_HOST:7054"
+            fabric-ca-client enroll -d -u https://$CA_ADMIN_USER_PASS@$CA_HOST:7054 --caname {{ printf "ca-%s" $ordererOrg.Name }} --tls.certfiles $FABRIC_CA_CLIENT_TLS_CERTFILES
+            echo "------"
+
+            echo "checking {{ $ordererOrg.Name }} orderer root dir..."
+            find $FABRIC_CA_CLIENT_HOME
+            echo "------"
+
+            {{- range $i, $host := $ordererOrg.Specs }}
+            echo "--- Registering {{ $host.Hostname }} from {{ $ordererOrg.Name }} with $CA_HOST"
+            export ORDERER_NAME={{ $host.Hostname }}-{{ $ordererOrg.Name | lower }}
+            export ORDERER_PASS={{ $host.Hostname }}-{{ $ordererOrg.Name | lower }}pw
+            fabric-ca-client register -d --id.name $ORDERER_NAME --id.secret $ORDERER_PASS --id.type orderer --caname {{ printf "ca-%s" $ordererOrg.Name }} --tls.certfiles $FABRIC_CA_CLIENT_TLS_CERTFILES
+            echo "------"
             {{- end }}
-            echo "Registering admin identity with "$CA_HOST
+
+            echo "--- Registering admin identity with "$CA_HOST
             #The admin identity has the "admin" attribute which is added to ECert by default
-            fabric-ca-client register -d --id.name $ORDERER_ADMIN_NAME --id.secret $ORDERER_ADMIN_PASS --id.attrs "admin=true:ecert"
+            fabric-ca-client register -d --id.name $ORDERER_ADMIN_NAME --id.secret $ORDERER_ADMIN_PASS --id.type admin --id.attrs "admin=true:ecert" --caname {{ printf "ca-%s" $ordererOrg.Name }} --tls.certfiles $FABRIC_CA_CLIENT_TLS_CERTFILES
+            echo "------"
+            echo "------"
+
+            echo "Orderer Identities Registered" > /{{ $ordererOrg.Domain }}/{{ printf "orderers.%s.registred" $ordererOrg.Domain }}
+            echo "----- Orderer {{ $ordererOrg.Name }} Identities Registered ----"
+            echo "find /{{ $ordererOrg.Domain }}"
+            find /{{ $ordererOrg.Domain }}
           else
-            echo "Org-"{{ $ordererOrg.Name | lower }}"already registered with network"
+            echo "Org-"{{ $ordererOrg.Name | lower }}" already registered with network"
           fi
-      
-          
-       
-     
+
       volumeMounts:
-        #- mountPath: /etc/hyperledger/fabric-ca-server-config/
-        #  name: ca-tls
         - mountPath: /hlf-scripts
           name: hlf-scripts
-        - mountPath: /hlf-orderer--{{ $ordererOrg.Name | lower }}
+
+        - mountPath: /{{ $ordererOrg.Domain }}
           name: hlf-orderer--{{ $ordererOrg.Name | lower }}
-        - mountPath: /hlf-ca--{{ $ordererOrg.Name | lower }}
+
+        - mountPath: /{{ $ordererOrg.Domain }}/fabric-ca
           name: hlf-ca--{{ $ordererOrg.Name | lower }}
-        
-             
+
+
       env:
         - name: FABRIC_LOGGING_SPEC
           value: {{ $.Values.logLevel }}
-        - name: FABRIC_CA_CLIENT_HOME
-          value: /etc/hyperledger/cas/ca-{{ $ordererOrg.Name | lower }}
         - name: CA_ADMIN_USER
           value: {{ $.Values.ca.userName }}
         - name: CA_ADMIN_PASS
@@ -222,73 +222,78 @@ spec:
           value: admin-{{ $ordererOrg.Name | lower }}
         - name: ORDERER_ADMIN_PASS
           value: admin-{{ $ordererOrg.Name | lower }}pw
+        - name: FABRIC_CA_CLIENT_HOME
+          value: /{{ $ordererOrg.Domain }}
         - name: FABRIC_CA_CLIENT_TLS_CERTFILES
-          value: /hlf-ca--{{ $ordererOrg.Name | lower }}/cert.pem
+          value: /{{ $ordererOrg.Domain }}/fabric-ca/tls-cert.pem
 
 {{- end }} {{- /* ordererOrgs */ -}}{{""}}
 
 
 # leaf register peer org identity registertemplates
 {{- range $i, $org := .Values.PeerOrgs }}
-  - name: register-peer-org--{{ $org.Name | lower }}
+  - name: register-peer-org-identities--{{ $org.Name | lower }}
     inputs:
     retryStrategy:
       limit: {{ $.Values.retryCount }}
     script:
-      image: hyperledger/fabric-tools:{{ $.Values.hyperledgerVersion }}
-      #image: hyperledger/fabric-tools:1.4.1
+      image: c0deh0use/fabric-ca-client-tools:{{ $.Values.FabricCaClientVersion }}
       command: [sh]
       source: |
-          if [ ! "$(ls -A /hlf-peer-org--{{ $org.Name | lower }})" ]; then
+          find /{{ $org.Domain | lower }}
 
-            echo "Installing required components for fabric-ca-client"
-            apt-get update && apt-get install -y netcat jq \
-            && apt-get install -y curl && rm -rf /var/cache/apt
-            curl -o /tmp/fabric-ca-client.tar.gz https://nexus.hyperledger.org/content/repositories/releases/org/hyperledger/fabric-ca/hyperledger-fabric-ca/linux-amd64-1.4.3/hyperledger-fabric-ca-linux-amd64-1.4.3.tar.gz && tar -xzvf /tmp/fabric-ca-client.tar.gz -C /tmp && cp /tmp/bin/fabric-ca-client /usr/local/bin
-            chmod +x /usr/local/bin/fabric-ca-client
+          if [ ! -f "/{{ $org.Domain | lower }}/{{ printf "peers.%s.registred" $org.Domain }}" ]; then
             FABRIC_CA_DYNAMIC_LINK=false
             if [ "\$FABRIC_CA_DYNAMIC_LINK" = "true" ]; then apt-get install -y libltdl-dev; fi
-            echo "Enrolling with http://"$CA_ADMIN_USER_PASS"@"$CA_HOST":7054"    
-            fabric-ca-client enroll -d -u http://$CA_ADMIN_USER_PASS@$CA_HOST:7054
 
-            
+            echo "--- Enrolling with https://$CA_ADMIN_USER_PASS@$CA_HOST:7054"
+            fabric-ca-client enroll -d -u https://$CA_ADMIN_USER_PASS@$CA_HOST:7054 --caname {{ printf "ca-%s" $org.Name }} --tls.certfiles $FABRIC_CA_CLIENT_TLS_CERTFILES
+            echo "------"
+
+            echo "--- Registering org admin identity with $CA_HOST"
+            #The admin identity has the "admin" attribute which is added to ECert by default
+
+            fabric-ca-client register -d --caname $CA_NAME --id.name $PEER_ADMIN_NAME --id.secret $PEER_ADMIN_PASS --id.type admin --caname {{ printf "ca-%s" $org.Name }} --tls.certfiles $FABRIC_CA_CLIENT_TLS_CERTFILES
+            echo "------"
+
             {{- range $peerIndex := until ($org.Template.Count | int) }}
             {{- $peer := (printf "peer%s" ($peerIndex | toString)) }}
-              
-              export PEER_NAME={{ $peer }}-{{ $org.Name }}
-              export PEER_PASS={{ $peer }}-{{ $org.Name }}pw
-              echo "Registering Peer_NAME:"$PEER_NAME
-              fabric-ca-client register -d --id.name $PEER_NAME --id.secret $PEER_PASS --id.type peer
-             
+
+            export PEER_NAME={{ $peer }}-{{ $org.Name | lower }}
+            export PEER_PASS={{ $peer }}-{{ $org.Name | lower }}pw
+
+            echo "--- Registering Peer: $PEER_NAME"
+            fabric-ca-client register -d --caname $CA_NAME --id.name $PEER_NAME --id.secret $PEER_PASS --id.type peer --caname {{ printf "ca-%s" $org.Name }} --tls.certfiles $FABRIC_CA_CLIENT_TLS_CERTFILES
+            echo "------"
             {{- end }}
-            echo "Registering org admin identity with "$CA_HOST
-            #The admin identity has the "admin" attribute which is added to ECert by default
-            fabric-ca-client register -d --id.name $ORG_ADMIN_NAME --id.secret $ORG_ADMIN_PASS --id.attrs "hf.Registrar.Roles=client,hf.Registrar.Attributes=*,hf.Revoker=true,hf.GenCRL=true,admin=true:ecert,abac.init=true:ecert"
-            log "Registering org user identity with $CA_NAME"
-            fabric-ca-client register -d --id.name $ORG_USER_NAME --id.secret $ORG_USER_PASS
+
+            log "--- Registering peer client: $PEER_USER_NAME identity with $CA_NAME"
+            fabric-ca-client register -d --caname $CA_NAME --id.name $PEER_USER_NAME --id.secret $PEER_USER_PASS ---id.type client --caname {{ printf "ca-%s" $org.Name }} --tls.certfiles $FABRIC_CA_CLIENT_TLS_CERTFILES
+            echo "------"
+
+            echo "Peer Identities Registered" > /{{ $org.Domain | lower }}/{{ printf "peers.%s.registred" $org.Domain }}
+            echo "------ Peer {{ $org.Name }} Identities registred ------"
+            echo "find /{{ $org.Domain | lower }}"
+            find /{{ $org.Domain | lower }}
           else
             echo "Org "{{ $org.Name | lower }}" identity already registerd with the network"
           fi
-          
-          
-       
-     
+
+
       volumeMounts:
-        #- mountPath: /etc/hyperledger/fabric-ca-server-config/
-        #  name: ca-tls
         - mountPath: /hlf-scripts
           name: hlf-scripts
-        - mountPath: /hlf-peer-org--{{ $org.Name | lower }}
+        - mountPath: /{{ $org.Domain | lower }}
           name: hlf-peer-org--{{ $org.Name | lower }}
-        - mountPath: /hlf-ca--{{ $org.Name | lower }}
+        - mountPath: /{{ $org.Domain }}/fabric-ca
           name: hlf-ca--{{ $org.Name | lower }}
-        
-             
+
+
       env:
         - name: FABRIC_LOGGING_SPEC
           value: {{ $.Values.logLevel }}
-        - name: FABRIC_CA_CLIENT_HOME
-          value: /etc/hyperledger/cas/ca-{{ $org.Name | lower }}
+        - name: CA_NAME
+          value: ca-{{ $org.Name }}
         - name: CA_ADMIN_USER
           value: {{ $.Values.ca.userName }}
         - name: CA_ADMIN_PASS
@@ -297,16 +302,22 @@ spec:
           value: {{ $.Values.ca.userName }}:{{ $.Values.ca.password }}
         - name: CA_HOST
           value: hlf-ca--{{ $org.Name | lower }}
-        - name: ORG_ADMIN_NAME
+        - name: PEER_ADMIN_NAME
           value: admin-{{ $org.Name | lower }}
-        - name: ORG_ADMIN_PASS
+        - name: PEER_ADMIN_PASS
           value: admin-{{ $org.Name | lower }}pw
-        - name: ORG_USER_NAME
+        - name: PEER_NAME
+          value: peer-{{ $org.Name | lower }}
+        - name: PEER_PASS
+          value: peer-{{ $org.Name | lower }}pw
+        - name: PEER_USER_NAME
           value: user-{{ $org.Name | lower }}
-        - name: ORG_USER_PASS
+        - name: PEER_USER_PASS
           value: user-{{ $org.Name | lower }}pw
+        - name: FABRIC_CA_CLIENT_HOME
+          value: /{{ $org.Domain }}
         - name: FABRIC_CA_CLIENT_TLS_CERTFILES
-          value: /hlf-ca--{{ $org.Name | lower }}/cert.pem
+          value: /{{ $org.Domain }}/fabric-ca/tls-cert.pem
 
 {{- end }} {{- /* PeerOrgs */ -}}{{""}}
 
@@ -318,67 +329,43 @@ spec:
     retryStrategy:
       limit: {{ $.Values.retryCount }}
     script:
-      image: hyperledger/fabric-tools:{{ $.Values.hyperledgerVersion }}
+      image: c0deh0use/fabric-ca-client-tools:{{ $.Values.FabricCaClientVersion }}
       #image: hyperledger/fabric-tools:1.4.1
       command: [sh]
       source: |
-          if [ ! -d $ORG_MSP_DIR ]; then
-            echo "Installing required components for fabric-ca-client"
-            apt-get update && apt-get install -y netcat jq \
-            && apt-get install -y curl && rm -rf /var/cache/apt
-            curl -o /tmp/fabric-ca-client.tar.gz https://nexus.hyperledger.org/content/repositories/releases/org/hyperledger/fabric-ca/hyperledger-fabric-ca/linux-amd64-1.4.3/hyperledger-fabric-ca-linux-amd64-1.4.3.tar.gz && tar -xzvf /tmp/fabric-ca-client.tar.gz -C /tmp && cp /tmp/bin/fabric-ca-client /usr/local/bin
-            chmod +x /usr/local/bin/fabric-ca-client
+          if [ ! -d "$ORDERER_CA_MSP_DIR" ]; then
+
             FABRIC_CA_DYNAMIC_LINK=false
             if [ "\$FABRIC_CA_DYNAMIC_LINK" = "true" ]; then apt-get install -y libltdl-dev; fi
-            echo "get orderer ca certificates  with http://"$CA_HOST":7054 -M "$ORG_MSP_DIR    
-            fabric-ca-client getcacert -d -u http://$CA_HOST:7054 -M $ORG_MSP_DIR
+
+            echo "get orderer ca certificates  with https://"$CA_HOST":7054 -M "$ORG_MSP_DIR
+            fabric-ca-client getcacert -d -u https://$CA_HOST:7054 -M $ORDERER_CA_MSP_DIR --tls.certfiles $FABRIC_CA_CLIENT_TLS_CERTFILES
 
             echo "setting up MSP for "$org.Name
 
-            if [ ! -d $ORG_MSP_DIR/tlscacerts ]; then
-              mkdir $ORG_MSP_DIR/tlscacerts
-              cp $ORG_MSP_DIR/cacerts/* $ORG_MSP_DIR/tlscacerts
+            if [ ! -d $ORDERER_CA_MSP_DIR/tlscacerts ]; then
+              mkdir $ORDERER_CA_MSP_DIR/tlscacerts
+              cp $ORDERER_CA_MSP_DIR/cacerts/* $ORDERER_CA_MSP_DIR/tlscacerts
             fi
 
-            
-            if [ ! -d $ORG_ADMIN_HOME ]; then
-              echo "Enrolling admin '$ADMIN_NAME' with $CA_HOST ..."
-              export FABRIC_CA_CLIENT_HOME=$ORG_ADMIN_HOME
-              fabric-ca-client enroll -d -u http://$ORG_ADMIN_NAME:$ORG_ADMIN_PASS@$CA_HOST:7054
-              # If admincerts are required in the MSP, copy the cert there now and to my local MSP also
-              if [ $.Values.adminCerts ]; then
-                mkdir -p $(dirname "${ORG_ADMIN_CERT}")
-                cp $ORG_ADMIN_HOME/msp/signcerts/* $ORG_ADMIN_CERT
-                mkdir $ORG_ADMIN_HOME/msp/admincerts
-                cp $ORG_ADMIN_HOME/msp/signcerts/* $ORG_ADMIN_HOME/msp/admincerts
-              fi
-              if [ ! -d $ORG_ADMIN_HOME/msp/tlscacerts ]; then
-                mkdir $ORG_ADMIN_HOME/msp/tlscacerts
-                cp $ORG_ADMIN_HOME/msp/cacerts/* $ORG_ADMIN_HOME/msp/tlscacerts
-              fi
-            fi
-            export CORE_PEER_MSPCONFIGPATH=$ORG_ADMIN_HOME/msp  
           else
             echo "Org "{{ $org.Name | lower }}" ca certificates exists"
           fi
-       
-     
+
+
       volumeMounts:
-        #- mountPath: /etc/hyperledger/fabric-ca-server-config/
-        #  name: ca-tls
         - mountPath: /hlf-scripts
           name: hlf-scripts
-        - mountPath: /hlf-orderer--{{ $org.Name | lower }}
+
+        - mountPath: /{{ $org.Domain }}
           name: hlf-orderer--{{ $org.Name | lower }}
-        
-        - mountPath: /hlf-ca--{{ $org.Name | lower }}
+
+        - mountPath: /{{ $org.Domain }}/fabric-ca
           name: hlf-ca--{{ $org.Name | lower }}
-             
+
       env:
         - name: FABRIC_LOGGING_SPEC
           value: {{ $.Values.logLevel }}
-        - name: FABRIC_CA_CLIENT_HOME
-          value: /etc/hyperledger/cas/ca-{{ $org.Name | lower }}
         - name: CA_ADMIN_USER
           value: {{ $.Values.ca.userName }}
         - name: CA_ADMIN_PASS
@@ -387,25 +374,87 @@ spec:
           value: {{ $.Values.ca.userName }}:{{ $.Values.ca.password }}
         - name: CA_HOST
           value: hlf-ca--{{ $org.Name | lower }}
-        - name: ORG_ADMIN_NAME
-          value: admin-{{ $org.Name | lower }}
-        - name: ORG_ADMIN_PASS
-          value: admin-{{ $org.Name | lower }}pw
-        - name: ORG_USER_NAME
-          value: user-{{ $org.Name | lower }}
-        - name: ORG_USER_PASS
-          value: user-{{ $org.Name | lower }}pw
         - name: FABRIC_CA_CLIENT_TLS_CERTFILES
-          value: /hlf-ca--{{ $org.Name | lower }}/cert.pem
-        - name: ORG_MSP_DIR
-          value: /hlf-orderer--{{ $org.Name | lower }}/msp
-        - name: ORG_ADMIN_HOME
-          value: /hlf-orderer--{{ $org.Name | lower }}/admin
-        - name: ORG_ADMIN_CERT
-          value: /hlf-orderer--{{ $org.Name | lower }}/msp/admincerts/cert.pem
+          value: /{{ $org.Domain }}/fabric-ca/tls-cert.pem
+        - name: ORDERER_CA_MSP_DIR
+          value: /{{ $org.Domain }}/ca-admin/msp
 
 {{- end }} {{- /* OrdererOrgs */ -}}{{""}}
 
+
+    # leaf get orderer ca certificate templates
+{{- range $i, $org := .Values.OrdererOrgs }}
+  - name: generate-orderer-admin-ca-cert--{{ $org.Name | lower }}
+    inputs:
+    retryStrategy:
+      limit: {{ $.Values.retryCount }}
+    script:
+      image: c0deh0use/fabric-ca-client-tools:{{ $.Values.FabricCaClientVersion }}
+      #image: hyperledger/fabric-tools:1.4.1
+      command: [sh]
+      source: |
+        if [ ! -f "$ORDERER_ADMIN_HOME/{{ printf "admin.%s" $org.Domain }}.finished" ]; then
+
+          mkdir -p "$ORDERER_ADMIN_HOME"
+          if [ ! -d $ORDERER_ADMIN_HOME/tls ]; then
+            echo "Enrolling admin '$ORDERER_ADMIN_NAME' with $CA_HOST ..."
+            fabric-ca-client enroll -d -u https://$ORDERER_ADMIN_NAME:$ORDERER_ADMIN_PASS@$CA_HOST:7054 -M $ORDERER_ADMIN_HOME/msp --caname {{ printf "ca-%s" $org.Name }} --tls.certfiles $FABRIC_CA_CLIENT_TLS_CERTFILES
+
+            fabric-ca-client enroll -d -u https://$ORDERER_ADMIN_NAME:$ORDERER_ADMIN_PASS@$CA_HOST:7054 -M $ORDERER_ADMIN_HOME/tls --caname {{ printf "ca-%s" $org.Name }} --enrollment.profile tls --tls.certfiles $FABRIC_CA_CLIENT_TLS_CERTFILES
+            cp $ORDERER_ADMIN_HOME/tls/tlscacerts/* $ORDERER_ADMIN_HOME/tls/ca.crt
+            cp $ORDERER_ADMIN_HOME/tls/signcerts/* $ORDERER_ADMIN_HOME/tls/server.crt
+            cp $ORDERER_ADMIN_HOME/tls/keystore/* $ORDERER_ADMIN_HOME/tls/server.key
+
+            echo "Orderer Admin CA Certs"
+            cat $ORDERER_ADMIN_HOME/msp/cacerts/hlf-ca--{{ $org.Name | lower }}-7054-ca-{{ $org.Name }}.pem
+            echo "------------------"
+          fi
+
+          if [ -f "$ORDERER_ADMIN_HOME/tls/server.crt" ]; then
+            echo "Orderer Admin ($ORDERER_ADMIN_NAME) - $org.Domain DONE" > $ORDERER_ADMIN_HOME/{{ printf "admin.%s" $org.Domain }}.finished
+          else
+            echo "Didnot/Failed finished orderer admin files"
+            exit -1
+          fi
+
+          export CORE_PEER_MSPCONFIGPATH=$ORDERER_ADMIN_HOME/msp
+          echo "searching for all files in: /{{ $org.Domain }}"
+          find /{{ $org.Domain }}
+        else
+          echo "Org "{{ $org.Name | lower }}" ca certificates exists"
+        fi
+
+      volumeMounts:
+        - mountPath: /hlf-scripts
+          name: hlf-scripts
+
+        - mountPath: /{{ $org.Domain }}
+          name: hlf-orderer--{{ $org.Name | lower }}
+
+        - mountPath: /{{ $org.Domain }}/fabric-ca
+          name: hlf-ca--{{ $org.Name | lower }}
+
+      env:
+        - name: FABRIC_LOGGING_SPEC
+          value: {{ $.Values.logLevel }}
+        - name: CA_ADMIN_USER
+          value: {{ $.Values.ca.userName }}
+        - name: CA_ADMIN_PASS
+          value: {{ $.Values.ca.password }}
+        - name: CA_ADMIN_USER_PASS
+          value: {{ $.Values.ca.userName }}:{{ $.Values.ca.password }}
+        - name: CA_HOST
+          value: hlf-ca--{{ $org.Name | lower }}
+        - name: ORDERER_ADMIN_NAME
+          value: admin-{{ $org.Name | lower }}
+        - name: ORDERER_ADMIN_PASS
+          value: admin-{{ $org.Name | lower }}pw
+        - name: FABRIC_CA_CLIENT_TLS_CERTFILES
+          value: /{{ $org.Domain }}/fabric-ca/tls-cert.pem
+        - name: ORDERER_ADMIN_HOME
+          value: /{{ $org.Domain }}/orderer-admin
+
+{{- end }} {{- /* OrdererOrgs */ -}}{{""}}
 
 # leaf get peer org ca certificate templates
 {{- range $i, $org := .Values.PeerOrgs }}
@@ -414,70 +463,50 @@ spec:
     retryStrategy:
       limit: {{ $.Values.retryCount }}
     script:
-      image: hyperledger/fabric-tools:{{ $.Values.hyperledgerVersion }}
+      image: c0deh0use/fabric-ca-client-tools:{{ $.Values.FabricCaClientVersion }}
       #image: hyperledger/fabric-tools:1.4.1
       command: [sh]
       source: |
-          if [ ! -d $ORG_MSP_DIR ]; then
+          if [ ! -d "$PEER_CA_MSP_DIR/tls" ]; then
+            echo "get peer ca certificates  with https://"$CA_HOST":7054 -M "$PEER_MSP_DIR
+            fabric-ca-client getcacert -d -u https://$CA_HOST:7054 -M $PEER_CA_MSP_DIR --tls.certfiles $FABRIC_CA_CLIENT_TLS_CERTFILES
 
-            echo "Installing required components for fabric-ca-client"
-            apt-get update && apt-get install -y netcat jq \
-            && apt-get install -y curl && rm -rf /var/cache/apt
-            curl -o /tmp/fabric-ca-client.tar.gz https://nexus.hyperledger.org/content/repositories/releases/org/hyperledger/fabric-ca/hyperledger-fabric-ca/linux-amd64-1.4.3/hyperledger-fabric-ca-linux-amd64-1.4.3.tar.gz && tar -xzvf /tmp/fabric-ca-client.tar.gz -C /tmp && cp /tmp/bin/fabric-ca-client /usr/local/bin
-            chmod +x /usr/local/bin/fabric-ca-client
-            FABRIC_CA_DYNAMIC_LINK=false
-            if [ "\$FABRIC_CA_DYNAMIC_LINK" = "true" ]; then apt-get install -y libltdl-dev; fi
-            echo "get orderer ca certificates  with http://"$CA_HOST":7054 -M "$ORG_MSP_DIR    
-            fabric-ca-client getcacert -d -u http://$CA_HOST:7054 -M $ORG_MSP_DIR
-
-            echo "setting up MSP for "$org.Name
-
-            if [ ! -d $ORG_MSP_DIR/tlscacerts ]; then
-              mkdir $ORG_MSP_DIR/tlscacerts
-              cp $ORG_MSP_DIR/cacerts/* $ORG_MSP_DIR/tlscacerts
+            if [ ! -d $PEER_CA_MSP_DIR/tlscacerts ]; then
+              mkdir $PEER_CA_MSP_DIR/tlscacerts
+              cp $PEER_CA_MSP_DIR/cacerts/* $PEER_CA_MSP_DIR/tlscacerts
             fi
 
-            
-            if [ ! -d $ORG_ADMIN_HOME ]; then
-              echo "Enrolling admin '$ADMIN_NAME' with $CA_HOST ..."
-              export FABRIC_CA_CLIENT_HOME=$ORG_ADMIN_HOME
-              fabric-ca-client enroll -d -u http://$ORG_ADMIN_NAME:$ORG_ADMIN_PASS@$CA_HOST:7054
-              # If admincerts are required in the MSP, copy the cert there now and to my local MSP also
-              if [ $.Values.adminCerts ]; then
-                mkdir -p $(dirname "${ORG_ADMIN_CERT}")
-                cp $ORG_ADMIN_HOME/msp/signcerts/* $ORG_ADMIN_CERT
-                mkdir $ORG_ADMIN_HOME/msp/admincerts
-                cp $ORG_ADMIN_HOME/msp/signcerts/* $ORG_ADMIN_HOME/msp/admincerts
-              fi
-              if [ ! -d $ORG_ADMIN_HOME/msp/tlscacerts ]; then
-                mkdir $ORG_ADMIN_HOME/msp/tlscacerts
-                cp $ORG_ADMIN_HOME/msp/cacerts/* $ORG_ADMIN_HOME/msp/tlscacerts
-              fi
+            // enroll Org Admin and store keys to admin folder.
+            find "$PEER_ADMIN_DIR/msp"
+            if [ ! -d "$PEER_ADMIN_DIR/msp" ]; then
+              echo "Enrolling admin '$PEER_ADMIN_NAME' with $CA_HOST ..."
+              fabric-ca-client enroll -d -u https://$PEER_ADMIN_NAME:$PEER_ADMIN_PASS@$CA_HOST:7054 -M $PEER_ADMIN_DIR/msp --caname {{ printf "ca-%s" $org.Name }} --tls.certfiles $FABRIC_CA_CLIENT_TLS_CERTFILES
             fi
-            export CORE_PEER_MSPCONFIGPATH=$ORG_ADMIN_HOME/msp 
+            export CORE_PEER_MSPCONFIGPATH=$PEER_ADMIN_DIR/msp
+            find /{{ $org.Domain | lower }}
           else
             echo "Org "{{ $org.Name | lower }}" ca certificates exists"
           fi  
-       
-     
+
+
       volumeMounts:
         #- mountPath: /etc/hyperledger/fabric-ca-server-config/
         #  name: ca-tls
         - mountPath: /hlf-scripts
           name: hlf-scripts
-        
-        - mountPath: /hlf-peer-org--{{ $org.Name | lower }}
+
+        - mountPath: /{{ $org.Domain | lower }}
           name: hlf-peer-org--{{ $org.Name | lower }}
-        
-        - mountPath: /hlf-ca--{{ $org.Name | lower }}
+
+        - mountPath: /{{ $org.Domain }}/fabric-ca
           name: hlf-ca--{{ $org.Name | lower }}
-             
-             
+
+
       env:
         - name: FABRIC_LOGGING_SPEC
           value: {{ $.Values.logLevel }}
         - name: FABRIC_CA_CLIENT_HOME
-          value: /etc/hyperledger/cas/ca-{{ $org.Name | lower }}
+          value: {{ $org.Domain }}/fabric-ca
         - name: CA_ADMIN_USER
           value: {{ $.Values.ca.userName }}
         - name: CA_ADMIN_PASS
@@ -486,22 +515,16 @@ spec:
           value: {{ $.Values.ca.userName }}:{{ $.Values.ca.password }}
         - name: CA_HOST
           value: hlf-ca--{{ $org.Name | lower }}
-        - name: ORG_ADMIN_NAME
+        - name: PEER_ADMIN_NAME
           value: admin-{{ $org.Name | lower }}
-        - name: ORG_ADMIN_PASS
+        - name: PEER_ADMIN_PASS
           value: admin-{{ $org.Name | lower }}pw
-        - name: ORG_USER_NAME
-          value: user-{{ $org.Name | lower }}
-        - name: ORG_USER_PASS
-          value: user-{{ $org.Name | lower }}pw
         - name: FABRIC_CA_CLIENT_TLS_CERTFILES
-          value: /hlf-ca--{{ $org.Name | lower }}/cert.pem
-        - name: ORG_MSP_DIR
-          value: /hlf-peer-org--{{ $org.Name | lower }}/msp
-        - name: ORG_ADMIN_HOME
-          value: /hlf-peer-org--{{ $org.Name | lower }}/admin
-        - name: ORG_ADMIN_CERT
-          value: /hlf-peer-org--{{ $org.Name | lower }}/msp/admincerts/cert.pem
+          value: /{{ $org.Domain }}/fabric-ca/tls-cert.pem
+        - name: PEER_CA_MSP_DIR
+          value: /{{ $org.Domain | lower }}/ca-admin/msp
+        - name: PEER_ADMIN_DIR
+          value: /{{ $org.Domain | lower }}/peer-admin/msp
 
 {{- end }} {{- /* PeerOrgs */ -}}{{""}}
 
@@ -512,58 +535,61 @@ spec:
     retryStrategy:
       limit: {{ $.Values.retryCount }}
     script:
-      image: hyperledger/fabric-tools:{{ $.Values.hyperledgerVersion }}
-      #image: hyperledger/fabric-tools:1.4.1
+      image: c0deh0use/fabric-tools:{{ $.Values.hyperledgerVersion }}
       command: [sh]
       source: |
 
           if [ ! -e /channel-artifacts/genesis.block ]; then
-            echo "Installing required components for fabric-ca-client"
-            apt-get update && apt-get install -y netcat jq \
-            && apt-get install -y curl && rm -rf /var/cache/apt
-            curl -o /tmp/fabric-ca-client.tar.gz https://nexus.hyperledger.org/content/repositories/releases/org/hyperledger/fabric-ca/hyperledger-fabric-ca/linux-amd64-1.4.3/hyperledger-fabric-ca-linux-amd64-1.4.3.tar.gz && tar -xzvf /tmp/fabric-ca-client.tar.gz -C /tmp && cp /tmp/bin/fabric-ca-client /usr/local/bin
-            chmod +x /usr/local/bin/fabric-ca-client
+
             FABRIC_CA_DYNAMIC_LINK=false
             if [ "\$FABRIC_CA_DYNAMIC_LINK" = "true" ]; then apt-get install -y libltdl-dev; fi
-            
-            echo "Create channel-artificats directory is not exists"
-            
-            
+
+            echo "Create channel-artificats directory does not exists"
+
+            {{- range $i, $org := $.Values.OrdererOrgs }}
+            echo "find {{ $org.Domain }} system channel configuration"
+            find /{{ $org.Domain }}/orderers/
+            {{- end }} {{- /* orderer orgs */ -}}{{""}}
+
+
             {{- $genesisProfile := $.Values.network.genesisProfile }}
             {{- $systemChannelID := $.Values.network.systemChannelID }}
-            echo "-- creating genesis block --"{{ $genesisProfile }}
-            ls /hlf_config/configtx/
+
+            echo "-- creating genesis block: {{ $genesisProfile }} for system channel: {{ $systemChannelID }}"
             configtxgen -profile {{ $genesisProfile }} -channelID {{ $systemChannelID }} -configPath /hlf_config/configtx -outputBlock /channel-artifacts/genesis.block
+
+            find /channel-artifacts
+            echo "-----------------"
           else
             echo "genesis block exists"
           fi
-     
-       
-     
+
       volumeMounts:
-        
+
         - mountPath: /channel-artifacts/
           name: channel-artifacts
+
         - mountPath: /hlf_config/
           name: hlf-configtx
+
         {{- range $i, $org := $.Values.OrdererOrgs }}
-        - mountPath: /hlf-orderer--{{ $org.Name | lower }}
+        - mountPath: /{{ $org.Domain }}
           name: hlf-orderer--{{ $org.Name | lower }}
         {{- end }} {{- /* orderer orgs */ -}}{{""}}
 
         {{- range $i, $org := $.Values.OrdererOrgs }}
         {{- range $i, $host := $org.Specs }}
-        - mountPath: /hlf-orderer--{{ $org.Name | lower }}--{{ $host.Hostname | lower }}
+        - mountPath: /{{ $org.Domain }}/orderers/{{ printf "%s.%s" ($host.Hostname | lower) $org.Domain }}
           name: hlf-orderer--{{ $org.Name | lower }}--{{ $host.Hostname | lower }}
         {{- end }} {{- /* orderer hosts */ -}}{{""}}
         {{- end }} {{- /* orderer orgs */ -}}{{""}}
 
-        
+
         {{- range $i, $org := $.Values.PeerOrgs }}
-        - mountPath: /hlf-peer-org--{{ $org.Name | lower }}
+        - mountPath: /{{ $org.Domain | lower }}
           name: hlf-peer-org--{{ $org.Name | lower }}
         {{- end }} {{- /* peer orgs */ -}}{{""}}
-        
+
 
       env:
         - name: FABRIC_LOGGING_SPEC
@@ -574,102 +600,110 @@ spec:
 # leaf order host generate certs templates
 {{- range $i, $org := .Values.OrdererOrgs }}
 {{- range $i, $host := $org.Specs }}
-{{- $cert_home := printf "/hlf-orderer--%s--%s" ($org.Name | lower) ($host.Hostname | lower) }}
-  - name: orderer-host-generate-certs--{{ $org.Name | lower }}--{{ $host.Hostname | lower }}
+{{- $ordererHome :=  printf "/%s/orderers/%s.%s" $org.Domain ($host.Hostname | lower) $org.Domain }}
+  - name: generate-orderer-host-generate-certs--{{ $org.Name | lower }}--{{ $host.Hostname | lower }}
     inputs:
     retryStrategy:
       limit: {{ $.Values.retryCount }}
     script:
-      image: hyperledger/fabric-tools:{{ $.Values.hyperledgerVersion }}
-      #image: hyperledger/fabric-tools:1.4.1
+      image: c0deh0use/fabric-ca-client-tools:{{ $.Values.FabricCaClientVersion }}
       command: [sh]
       source: |
+          echo "Orderer {{ $host.Hostname | lower }} home dir: {{ $ordererHome }}"
+          if [ ! -f "{{ $ordererHome }}/{{ printf "%s.%s" $host.Hostname $org.Domain }}.finished" ]; then
+            echo "---------"
+            mkdir -p {{ $ordererHome }}
 
-          if [ ! "$(ls -A {{ $cert_home | lower }})" ]; then
-            echo "Installing required components for fabric-ca-client"
-            apt-get update && apt-get install -y netcat jq \
-            && apt-get install -y curl && rm -rf /var/cache/apt
-            curl -o /tmp/fabric-ca-client.tar.gz https://nexus.hyperledger.org/content/repositories/releases/org/hyperledger/fabric-ca/hyperledger-fabric-ca/linux-amd64-1.4.3/hyperledger-fabric-ca-linux-amd64-1.4.3.tar.gz && tar -xzvf /tmp/fabric-ca-client.tar.gz -C /tmp && cp /tmp/bin/fabric-ca-client /usr/local/bin
-            chmod +x /usr/local/bin/fabric-ca-client
-            FABRIC_CA_DYNAMIC_LINK=false
-            if [ "\$FABRIC_CA_DYNAMIC_LINK" = "true" ]; then apt-get install -y libltdl-dev; fi
-            
-            echo "Enroll to get orderer's TLS cert (using the "tls" profile)"
-            export ORDERER_NAME_PASS=$ORDERER_NAME:$ORDERER_PASS
-            export ENROLLMENT_URL=http://$ORDERER_NAME_PASS@$CA_HOST:7054
-            echo "ENROLLEMNT_URL:"$ENROLLMENT_URL
-            #fabric-ca-client enroll -d --enrollment.profile tls -u http://orderer0-AreteOrderer:orderer0-AreteOrdererpw@hlf-ca--areteorderer:7054 -M /tmp/tls --csr.hosts orderer0-areteorderer
-            fabric-ca-client enroll -d --enrollment.profile tls -u $ENROLLMENT_URL -M /tmp/tls --csr.hosts $ORDERER_HOST
-            
-            echo "Copy the TLS key and cert to the appropriate place"
-            TLSDIR=$ORDERER_HOME/tls
-            mkdir -p $TLSDIR
-            cp /tmp/tls/keystore/* $ORDERER_GENERAL_TLS_PRIVATEKEY
-            cp /tmp/tls/signcerts/* $ORDERER_GENERAL_TLS_CERTIFICATE
-            rm -rf /tmp/tls
+            echo "Enroll $ORDERER_NAME user as orderer type to $CA_HOST:7054"
 
-            echo "Enroll again to get the orderer's enrollment certificate (default profile)"
-            fabric-ca-client enroll -d -u $ENROLLMENT_URL -M $ORDERER_GENERAL_LOCALMSPDIR
+            echo "Enroll orderer certificate (default profile)"
+            fabric-ca-client enroll -d -u "https://$ORDERER_NAME:$ORDERER_PASS@$CA_HOST:7054" --caname {{ printf "ca-%s" $org.Name }} -M $ORDERER_GENERAL_LOCAL_MSP_DIR --csr.hosts $ORDERER_HOST --csr.hosts localhost --tls.certfiles $FABRIC_CA_CLIENT_TLS_CERTFILES
 
+            echo "Enroll again to get the orderer's enrollment certificate (tls profile)"
+            fabric-ca-client enroll -d -u "https://$ORDERER_NAME:$ORDERER_PASS@$CA_HOST:7054" --caname {{ printf "ca-%s" $org.Name }} -M $ORDERER_GENERAL_LOCAL_TLS_DIR --csr.hosts $ORDERER_HOST --csr.hosts localhost --enrollment.profile tls --tls.certfiles $FABRIC_CA_CLIENT_TLS_CERTFILES
+
+            cp {{ $ordererHome }}/tls/keystore/* $ORDERER_GENERAL_TLS_PRIVATEKEY
+            cp {{ $ordererHome }}/tls/signcerts/* $ORDERER_GENERAL_TLS_CERTIFICATE
+            cp {{ $ordererHome }}/tls/tlscacerts/* $ORDERER_GENERAL_CA_CERTIFICATE
+
+            echo "Orderer CA Certs"
+            cat {{ $ordererHome }}/tls/signcerts/cert.pem
+            echo "------------------"
+
+{{/*            echo "NodeOUs:*/}}
+{{/*            Enable: true*/}}
+{{/*            ClientOUIdentifier:*/}}
+{{/*              Certificate: cacerts/hlf-ca--{{ $org.Name | lower }}-7054-ca-{{ $org.Name }}.pem*/}}
+{{/*              OrganizationalUnitIdentifier: client*/}}
+{{/*            PeerOUIdentifier:*/}}
+{{/*              Certificate: cacerts/hlf-ca--{{ $org.Name | lower }}-7054-ca-{{ $org.Name }}.pem*/}}
+{{/*              OrganizationalUnitIdentifier: peer*/}}
+{{/*            AdminOUIdentifier:*/}}
+{{/*              Certificate: cacerts/hlf-ca--{{ $org.Name | lower }}-7054-ca-{{ $org.Name }}.pem*/}}
+{{/*              OrganizationalUnitIdentifier: admin*/}}
+{{/*            OrdererOUIdentifier:*/}}
+{{/*              Certificate: cacerts/hlf-ca--{{ $org.Name | lower }}-7054-ca-{{ $org.Name }}.pem*/}}
+{{/*              OrganizationalUnitIdentifier: orderer" >> $ORDERER_GENERAL_LOCAL_MSP_DIR/orderer_node_ou-config.yaml*/}}
+
+            echo "------"
+            cat $ORDERER_GENERAL_LOCAL_MSP_DIR/config.yaml
+            echo "------"
+            echo "------"
+            echo "------"
             echo "Finish setting up the local MSP for the orderer"
-            
-            if [ ! -d $ORDERER_GENERAL_LOCALMSPDIR/tlscacerts ]; then
-              mkdir $ORDERER_GENERAL_LOCALMSPDIR/tlscacerts
-              cp $ORDERER_GENERAL_LOCALMSPDIR/cacerts/* $ORDERER_GENERAL_LOCALMSPDIR/tlscacerts
-        
+
+            if [ ! -d $ORDERER_GENERAL_LOCAL_MSP_DIR/tlscacerts ]; then
+              mkdir $ORDERER_GENERAL_LOCAL_MSP_DIR/tlscacerts
+              cp $ORDERER_GENERAL_LOCAL_MSP_DIR/cacerts/* $ORDERER_GENERAL_LOCAL_MSP_DIR/tlscacerts
             fi
-            echo "Copy the org's admin cert into some target MSP directory.This is only required if ADMINCERTS is enabled"
-            if [ $.Values.adminCerts ]; then
-              dstDir=$ORDERER_GENERAL_LOCALMSPDIR/admincerts
-              mkdir -p $dstDir
-              cp $ORG_ADMIN_CERT $dstDir
+
+            if [ -f "$ORDERER_GENERAL_TLS_CERTIFICATE" ]; then
+              echo "Orderer - {{ printf "%s.%s" $host.Hostname $org.Domain }} DONE" > {{ $ordererHome }}/{{ printf "%s.%s" $host.Hostname $org.Domain }}.finished
+            else
+              echo "Didnot/Failed finished orderer host files"
+              exit -1
             fi
+
+            echo "searching for all files in: {{ $ordererHome }}"
+            find {{ $ordererHome }}
           else
             echo {{ $org.Name | lower }}--{{ $host.Hostname | lower }}" certificates exists already"
-          fi 
-          
-      
+          fi
 
-     
+
       volumeMounts:
-        #- mountPath: /etc/hyperledger/fabric-ca-server-config/
-        #  name: ca-tls
         - mountPath: /hlf-scripts
           name: hlf-scripts
-        - mountPath: /hlf-orderer--{{ $org.Name | lower }}
-          name: hlf-orderer--{{ $org.Name | lower }}
 
-        - mountPath: /hlf-orderer--{{ $org.Name | lower }}--{{ $host.Hostname | lower }}
+        - mountPath: /{{ $org.Domain }}/orderers/{{ printf "%s.%s" ($host.Hostname | lower) $org.Domain }}
           name: hlf-orderer--{{ $org.Name | lower }}--{{ $host.Hostname | lower }}
-        
-        - mountPath: /hlf-ca--{{ $org.Name | lower }}
+
+        - mountPath: /{{ $org.Domain }}/fabric-ca
           name: hlf-ca--{{ $org.Name | lower }}
-             
+
       env:
-        - name: MY_HOME
-          value: /hlf-orderer--{{ $org.Name | lower }}--{{ $host.Hostname | lower }}
         - name: FABRIC_LOGGING_SPEC
           value: debug
-        - name: FABRIC_CA_CLIENT_HOME
-          value: {{ $cert_home }}
-        - name : ORDERER_HOME
-          value: {{ $cert_home }}
         - name: ORDERER_GENERAL_TLS_PRIVATEKEY
-          value: {{ $cert_home }}/tls/server.key
+          value: {{ $ordererHome }}/tls/server.key
         - name: ORDERER_GENERAL_TLS_CERTIFICATE
-          value: {{ $cert_home }}/tls/server.crt
-        - name: ORDERER_GENERAL_LOCALMSPDIR
-          value: {{ $cert_home }}/msp
-        - name: ORG_ADMIN_CERT
-          value: /hlf-orderer--{{ $org.Name | lower }}/msp/admincerts/cert.pem
+          value: {{ $ordererHome }}/tls/server.crt
+        - name: ORDERER_GENERAL_CA_CERTIFICATE
+          value: {{ $ordererHome }}/tls/ca.crt
+        - name: ORDERER_GENERAL_LOCAL_MSP_DIR
+          value: {{ $ordererHome }}/msp
+        - name: ORDERER_GENERAL_LOCAL_TLS_DIR
+          value: {{ $ordererHome }}/tls
         - name: CA_HOST
           value: hlf-ca--{{ $org.Name | lower }}
         - name: ORDERER_NAME
-          value: {{ $host.Hostname }}-{{ $org.Name }}
-        - name: ORDERER_PASS 
-          value: {{ $host.Hostname }}-{{ $org.Name }}pw
+          value: {{ $host.Hostname }}-{{ $org.Name | lower }}
+        - name: ORDERER_PASS
+          value: {{ $host.Hostname }}-{{ $org.Name | lower }}pw
+        - name: FABRIC_CA_CLIENT_HOME
+          value: /{{ $org.Domain }}/fabric-ca
         - name: FABRIC_CA_CLIENT_TLS_CERTFILES
-          value: /hlf-ca--{{ $org.Name | lower }}/cert.pem
+          value: /{{ $org.Domain }}/fabric-ca/tls-cert.pem
         - name : ORDERER_HOST
           value: {{ $host.Hostname | lower }}.{{ $org.Domain | lower }}
 
@@ -682,119 +716,107 @@ spec:
 {{- range $i, $org := .Values.PeerOrgs }}
 {{- range $peerIndex := until ($org.Template.Count | int) }}
 {{- $peer := (printf "peer%s" ($peerIndex | toString)) }}
-{{- $cert_home := printf "/hlf-peer--%s--%s" ($org.Name | lower) ($peer | lower) }}
+{{- $peerHome :=  printf "/%s/peers/%s.%s" $org.Domain $peer $org.Domain }}
   - name: peer-generate-certs--{{ $org.Name | lower }}--{{ $peer | lower }}
     inputs:
     retryStrategy:
       limit: {{ $.Values.retryCount }}
     script:
-      image: hyperledger/fabric-tools:{{ $.Values.hyperledgerVersion }}
+      image: c0deh0use/fabric-ca-client-tools:{{ $.Values.FabricCaClientVersion }}
       #image: hyperledger/fabric-tools:1.4.1
       command: [sh]
       source: |
+          if [ ! -f "{{ $peerHome }}/{{ printf "%s.%s" $peer $org.Domain }}.finished" ]; then
+            echo "---------"
+            mkdir -p {{ printf "/%s" $org.Domain }}
+            mkdir -p {{ printf "/%s/peers" $org.Domain }}
+            mkdir -p {{ $peerHome }}
 
-          if [ ! "$(ls -A {{ $cert_home | lower }})" ]; then
-            echo "Installing required components for fabric-ca-client"
-            apt-get update && apt-get install -y netcat jq \
-            && apt-get install -y curl && rm -rf /var/cache/apt
-            curl -o /tmp/fabric-ca-client.tar.gz https://nexus.hyperledger.org/content/repositories/releases/org/hyperledger/fabric-ca/hyperledger-fabric-ca/linux-amd64-1.4.3/hyperledger-fabric-ca-linux-amd64-1.4.3.tar.gz && tar -xzvf /tmp/fabric-ca-client.tar.gz -C /tmp && cp /tmp/bin/fabric-ca-client /usr/local/bin
-            chmod +x /usr/local/bin/fabric-ca-client
-            FABRIC_CA_DYNAMIC_LINK=false
-            if [ "\$FABRIC_CA_DYNAMIC_LINK" = "true" ]; then apt-get install -y libltdl-dev; fi
-            
-            echo "Enroll to get peer TLS cert (using the "tls" profile)"
-            export PEER_NAME_PASS=$PEER_NAME:$PEER_PASS
-            export ENROLLMENT_URL=http://$PEER_NAME_PASS@$CA_HOST:7054
-            echo "ENROLLEMNT_URL:"$ENROLLMENT_URL
-            fabric-ca-client enroll -d --enrollment.profile tls -u $ENROLLMENT_URL -M /tmp/tls --csr.hosts $PEER_HOST
-            
+            echo "Enroll peer"
+            fabric-ca-client enroll -d -u "https://$PEER_NAME:$PEER_PASS@$CA_HOST:7054" -M $PEER_GENERAL_LOCALMSPDIR --caname {{ printf "ca-%s" $org.Name }} --csr.hosts $PEER_HOST --tls.certfiles $FABRIC_CA_CLIENT_TLS_CERTFILES
+            echo "---------"
+
+            echo "NodeOUs:
+            Enable: true
+            ClientOUIdentifier:
+              Certificate: cacerts/hlf-ca--{{ $org.Name | lower }}-7054-ca-{{ $org.Name }}.pem
+              OrganizationalUnitIdentifier: client
+            PeerOUIdentifier:
+              Certificate: cacerts/hlf-ca--{{ $org.Name | lower }}-7054-ca-{{ $org.Name }}.pem
+              OrganizationalUnitIdentifier: peer
+            AdminOUIdentifier:
+              Certificate: cacerts/hlf-ca--{{ $org.Name | lower }}-7054-ca-{{ $org.Name }}.pem
+              OrganizationalUnitIdentifier: admin
+            OrdererOUIdentifier:
+              Certificate: cacerts/hlf-ca--{{ $org.Name | lower }}-7054-ca-{{ $org.Name }}.pem
+              OrganizationalUnitIdentifier: orderer
+            " >> "$PEER_GENERAL_LOCALMSPDIR/config.yaml"
+
+            echo "Enroll peer TLS cert (using the "tls" profile)"
+            fabric-ca-client enroll -d -u "https://$PEER_NAME:$PEER_PASS@$CA_HOST:7054" -M {{ $peerHome }}/tls --caname {{ printf "ca-%s" $org.Name }} --enrollment.profile tls --csr.hosts $PEER_HOST --csr.hosts localhost --tls.certfiles $FABRIC_CA_CLIENT_TLS_CERTFILES
+            echo "---------"
+
             echo "Copy the TLS key and cert to the appropriate place"
-            TLSDIR=$PEER_HOME/tls
-            mkdir -p $TLSDIR
-            cp /tmp/tls/keystore/* $PEER_GENERAL_TLS_PRIVATEKEY
-            cp /tmp/tls/signcerts/* $PEER_GENERAL_TLS_CERTIFICATE
-            rm -rf /tmp/tls
-
-            
-            export CORE_PEER_TLS_CLIENTCERT_FILE={{ $cert_home }}/tls/$PEER_NAME-cli-client.crt
-            export CORE_PEER_TLS_CLIENTKEY_FILE={{ $cert_home }}/tls/$PEER_NAME-cli-client.key
-            HOST_NAME=$PEER_NAME
-            CERT_FILE=$CORE_PEER_TLS_CLIENTCERT_FILE
-            KEY_FILE=$CORE_PEER_TLS_CLIENTKEY_FILE
-
-            echo "Get a client cert which can be used both for peer and cli"
-            fabric-ca-client enroll -d --enrollment.profile tls -u $ENROLLMENT_URL -M /tmp/tls --csr.hosts $HOST_NAME
-
-            mkdir {{ $cert_home }}/tls || true
-            cp /tmp/tls/signcerts/* $CERT_FILE
-            cp /tmp/tls/keystore/* $KEY_FILE
-
-
-            echo "Enroll again to get the peer's enrollment certificate (default profile)"
-            fabric-ca-client enroll -d -u $ENROLLMENT_URL -M $PEER_GENERAL_LOCALMSPDIR
+            find {{ $peerHome }}
+            echo "---------"
+            cp {{ $peerHome }}/tls/tlscacerts/* {{ $peerHome }}/tls/ca.crt
+            cp {{ $peerHome }}/tls/signcerts/* {{ $peerHome }}/tls/server.crt
+            cp {{ $peerHome }}/tls/keystore/* {{ $peerHome }}/tls/server.key
 
             echo "Finish setting up the local MSP for the peer"
-            
-            if [ ! -d $1/tlscacerts ]; then
-              mkdir $PEER_GENERAL_LOCALMSPDIR/tlscacerts
-              cp $PEER_GENERAL_LOCALMSPDIR/cacerts/* $PEER_GENERAL_LOCALMSPDIR/tlscacerts
-        
+
+            if [ ! -d $PEER_GENERAL_LOCALMSPDIR/tlscacerts ]; then
+              mkdir -p $PEER_GENERAL_LOCALMSPDIR/tlscacerts
+              cp {{ $peerHome }}/msp/cacerts/* $PEER_GENERAL_LOCALMSPDIR/tlscacerts
             fi
-            echo "Copy the org's admin cert into some target MSP directory.This is only required if ADMINCERTS is enabled"
-            if [ $.Values.adminCerts ]; then
-              dstDir=$PEER_GENERAL_LOCALMSPDIR/admincerts
-              mkdir -p $dstDir
-              cp $ORG_ADMIN_CERT $dstDir
+
+            echo "find in {{ $peerHome }}"
+            find {{ $peerHome }}
+            echo "-------------"
+
+            if [ -f "{{ $peerHome }}/tls/server.crt" ]; then
+              echo "Peer - {{ printf "%s.%s" $peer $org.Domain }} DONE" > {{ $peerHome }}/{{ printf "%s.%s" $peer $org.Domain }}.finished
+            else
+              echo "Didnot/Failed finished peer host files"
+              exit -1
             fi
+
           else
             echo {{ $org.Name | lower }}--{{ $peer | lower }}" certificates exists already"
           fi
-          
-      
 
-     
+
       volumeMounts:
         #- mountPath: /etc/hyperledger/fabric-ca-server-config/
         #  name: ca-tls
         - mountPath: /hlf-scripts
           name: hlf-scripts
-       
-        - mountPath: /hlf-peer-org--{{ $org.Name | lower }}
+
+        - mountPath: /{{ $org.Domain | lower }}
           name: hlf-peer-org--{{ $org.Name | lower }}
 
-        - mountPath: /hlf-peer--{{ $org.Name | lower }}--{{ $peer | lower }}
+        - mountPath: {{ $peerHome }}
           name: hlf-peer--{{ $org.Name | lower }}--{{ $peer | lower }}
-        
-        - mountPath: /hlf-ca--{{ $org.Name | lower }}
+
+        - mountPath: /{{ $org.Domain }}/fabric-ca
           name: hlf-ca--{{ $org.Name | lower }}
-             
-        
-             
+
+
       env:
-        - name: MY_HOME
-          value: /hlf-peer--{{ $org.Name | lower }}--{{ $peer | lower }}
         - name: FABRIC_LOGGING_SPEC
           value: debug
-        - name: FABRIC_CA_CLIENT_HOME
-          value: {{ $cert_home }}
-        - name : PEER_HOME
-          value: {{ $cert_home }}
-        - name: PEER_GENERAL_TLS_PRIVATEKEY
-          value: {{ $cert_home }}/tls/server.key
-        - name: PEER_GENERAL_TLS_CERTIFICATE
-          value: {{ $cert_home }}/tls/server.crt
         - name: PEER_GENERAL_LOCALMSPDIR
-          value: {{ $cert_home }}/msp
-        - name: ORG_ADMIN_CERT
-          value: /hlf-peer-org--{{ $org.Name | lower }}/msp/admincerts/cert.pem
+          value: {{ $peerHome }}/msp
         - name: CA_HOST
           value: hlf-ca--{{ $org.Name | lower }}
         - name: PEER_NAME
-          value: {{ $peer }}-{{ $org.Name }}
-        - name: PEER_PASS 
-          value: {{ $peer }}-{{ $org.Name }}pw
+          value: {{ $peer }}-{{ $org.Name | lower }}
+        - name: PEER_PASS
+          value: {{ $peer }}-{{ $org.Name | lower }}pw
+        - name: FABRIC_CA_CLIENT_HOME
+          value: /{{ $org.Domain }}/fabric-ca
         - name: FABRIC_CA_CLIENT_TLS_CERTFILES
-          value: /hlf-ca--{{ $org.Name | lower }}/cert.pem
+          value: /{{ $org.Domain }}/fabric-ca/tls-cert.pem
         - name : PEER_HOST
           value: {{ $peer | lower }}.{{ $org.Domain | lower }}
 

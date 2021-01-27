@@ -8,12 +8,32 @@ metadata:
 spec:
   accessModes:
     - ReadWriteMany
-  storageClassName: {{ $.Values.vault.pvc.storageClass }}
+  storageClassName: {{ $.Values.vault.nfs.storageClass }}
   resources:
     requests:
-      storage: {{ $.Values.vault.pvc.size }}
+      storage: {{ $.Values.vault.nfs.pvc_size }}
 
 ---
 {{- end }} {{- /* Orderers */ -}}
 {{- end }} {{- /* pvc */ -}}
 
+
+{{ if eq .Values.vault.type "nfs" }}
+{{- range $i, $org := .Values.OrdererOrgs }}
+
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: hlf-ca--{{ $org.Name | lower }}
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: {{ $.Values.vault.nfs.storageClass }}
+  volumeMode: Filesystem
+  resources:
+    requests:
+      storage: {{ $.Values.vault.nfs.pvc_size }}
+
+---
+{{- end }} {{- /* Orderers */ -}}
+{{- end }} {{- /* pvc */ -}}

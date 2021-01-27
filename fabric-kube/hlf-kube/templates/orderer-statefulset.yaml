@@ -33,6 +33,11 @@ spec:
         app: hlf-orderer--{{ $org.Name | lower }}--{{ $host.Hostname | lower }}
     spec:
       volumes:
+      - name: orderer-nodeou-config
+        configMap:
+          name: hlf-orderer-nodeou-config
+          defaultMode: 0777
+
       {{- if not $.Values.orderer.persistence.enabled }}
       - name: orderer-disk
         emptyDir: {}
@@ -44,21 +49,17 @@ spec:
       - name: hlf-orderer--{{ $org.Name | lower }}
         persistentVolumeClaim:
           claimName: hlf-orderer--{{ $org.Name | lower }}
-      #- name: hlf-ca--{{ $org.Name | lower }}
-      #  persistentVolumeClaim:
-      #    claimName: hlf-ca--{{ $org.Name | lower }}
-      {{- range $i, $host := $org.Specs }}
 
+      {{- range $i, $host := $org.Specs }}
       - name: hlf-orderer--{{ $org.Name | lower }}--{{ $host.Hostname | lower }}
         persistentVolumeClaim:
           claimName: hlf-orderer--{{ $org.Name | lower }}--{{ $host.Hostname | lower }}
-
       {{- end }} {{- /* orderer hosts */ -}}{{""}}
       {{- end }} {{- /* orderer orgs */ -}}{{""}}
+
       - name: channel-artifacts
         persistentVolumeClaim:
           claimName: channel-artifacts
-      
 
       {{- if $.Values.hostAliases }}
       hostAliases:
@@ -131,34 +132,69 @@ spec:
 
       {{- else }}
       
+      {{- if $.Values.orderer.antiAffinity.enabled }}
+      {{- if gt (len $org.Specs) 1 }}
+      affinity:
+        podAntiAffinity:
+      {{- if $.Values.orderer.antiAffinity.strict }}
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - topologyKey: kubernetes.io/hostname
+            labelSelector:
+              matchExpressions:
+              - key: app
+                operator: In
+                values:
+                {{- range $i, $hostInner := $org.Specs }}
+                {{- if not (eq $host.Hostname $hostInner.Hostname) }}
+                - hlf-orderer--{{ $org.Name | lower }}--{{ $hostInner.Hostname | lower }}
+                {{- end }} {{- /* if not same host */ -}}
+                {{- end }} {{- /* org.Specs */ -}}{{""}}
+      {{- else }}
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              topologyKey: kubernetes.io/hostname
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  {{- range $i, $hostInner := $org.Specs }}
+                  {{- if not (eq $host.Hostname $hostInner.Hostname) }}
+                  - hlf-orderer--{{ $org.Name | lower }}--{{ $hostInner.Hostname | lower }}
+                  {{- end }} {{- /* if not same host */ -}}
+                  {{- end }} {{- /* org.Specs */ -}}{{""}}
+      {{- end }}{{- /* if-else antiAffinity.strict */ -}}
+      {{- end }}{{- /* if peer count > 1 */ -}}
+      {{- end }}{{- /* if antiAffinity.enabled */ -}}{{""}}
+
+      containers:
+
+      # Orderer container
       - name: orderer
         image: hyperledger/fabric-orderer:{{ $.Values.hyperledgerVersion }}
-        command: ["sh", "-c", "orderer"]
+        workingDir: /opt/gopath/src/github.com/hyperledger/fabric
+        command: ["sh", "-c", "find /var/hyperledger/orderer/ && cp /var/hyperledger/orderer/nodeOU/config.yaml /var/hyperledger/orderer/msp/config.yaml && orderer"]
 
         volumeMounts:
-
-        - mountPath: /hlf-orderer--{{ $org.Name | lower }}
-          name: hlf-orderer--{{ $org.Name | lower }}
-          
         - mountPath: /var/hyperledger/production/orderer/
           name: orderer-disk
-        
-        - mountPath: /var/hyperledger/orderer/tls/
+
+        - mountPath: /var/hyperledger/orderer/msp
           name: hlf-orderer--{{ $org.Name | lower }}--{{ $host.Hostname | lower }}
-          subPath: tls 
-        
-        - mountPath: /var/hyperledger/orderer/msp/
+          subPath: msp
+
+        - mountPath: /var/hyperledger/orderer/tls
           name: hlf-orderer--{{ $org.Name | lower }}--{{ $host.Hostname | lower }}
-          subPath: msp 
-        
-        - mountPath: /var/hyperledger/orderer/
+          subPath: tls
+
+        - mountPath: /var/hyperledger/channel-artifacts
           name: channel-artifacts
-          #subPath: channel-artifacts 
-        
-       
-        
+
+        - mountPath: /var/hyperledger/orderer/nodeOU
+          name: orderer-nodeou-config
+
         env:
-        # TODO move configurable ones to configmaps
         - name: FABRIC_LOGGING_SPEC
           value: {{ $.Values.orderer.logLevel }}
         - name: ORDERER_GENERAL_LISTENADDRESS
@@ -166,7 +202,7 @@ spec:
         - name: ORDERER_GENERAL_GENESISMETHOD
           value: file
         - name: ORDERER_GENERAL_GENESISFILE
-          value: /var/hyperledger/orderer/genesis.block
+          value: /var/hyperledger/channel-artifacts/genesis.block
         - name: ORDERER_GENERAL_LOCALMSPID
           value: {{ $org.Name }}MSP
         - name: ORDERER_GENERAL_LOCALMSPDIR
@@ -178,25 +214,45 @@ spec:
         - name: ORDERER_GENERAL_TLS_CERTIFICATE
           value: /var/hyperledger/orderer/tls/server.crt
         - name: ORDERER_GENERAL_TLS_ROOTCAS
-          value: /var/hyperledger/orderer/msp/tlscacerts/hlf-ca--{{ $org.Name | lower }}-7054.pem
+          value: /var/hyperledger/orderer/tls/ca.crt
 
         - name: ORDERER_GENERAL_CLUSTER_CLIENTPRIVATEKEY
           value: /var/hyperledger/orderer/tls/server.key
         - name: ORDERER_GENERAL_CLUSTER_CLIENTCERTIFICATE
           value: /var/hyperledger/orderer/tls/server.crt
-        # - name: ORDERER_GENERAL_CLUSTER_SERVERPRIVATEKEY
-        #   value: /var/hyperledger/orderer/tls/server.key
-        # - name: ORDERER_GENERAL_CLUSTER_SERVERCERTIFICATE
-        #   value: /var/hyperledger/orderer/tls/server.crt
-        # - name: ORDERER_GENERAL_CLUSTER_LISTENPORT
-        #   value: "7059"
-        # - name: ORDERER_GENERAL_CLUSTER_LISTENADDRESS
-        #   value: 0.0.0.0
+        - name: ORDERER_GENERAL_CLUSTER_ROOTCAS
+          value: /var/hyperledger/orderer/tls/ca.crt
+
+        # Raft cluster configuration
+        {{- if $.Values.orderer.cluster.enabled }}
+        - name: ORDERER_GENERAL_CLUSTER_SERVERPRIVATEKEY
+          value: /var/hyperledger/orderer/tls/server.key
+        - name: ORDERER_GENERAL_CLUSTER_SERVERCERTIFICATE
+          value: /var/hyperledger/orderer/tls/server.crt
+        - name: ORDERER_GENERAL_CLUSTER_LISTENPORT
+          value: {{ $.Values.orderer.cluster.port | quote }}
+        - name: ORDERER_GENERAL_CLUSTER_LISTENADDRESS
+          value: 0.0.0.0
+        {{- end }}
+
+        # Operations configuration
+        {{- if $.Values.orderer.operations.enabled }}
+        - name: ORDERER_OPERATIONS_LISTENADDRESS
+          value: {{ $.Values.orderer.operations.listenAddress }}
+        - name: ORDERER_OPERATIONS_TLS_ENABLED
+          value: {{ $.Values.orderer.operations.tls.enabled | quote }}
+        {{- end }}
+
+        # Metrics configuration with Prometheus
+        {{-  if $.Values.orderer.metrics.enabled }}
+        - name: ORDERER_METRICS_PROVIDER
+          value: {{ $.Values.orderer.metrics.provider }}
+        {{ end }}
 
         - name: HFC_LOGGING
           value: '{"info":"console"}'
         - name: GRPC_VERBOSITY
-          value: ERROR
+          value: DEBUG
         - name: GRPC_TRACE
           value:  all
       {{- end }} {{- /* if/else backup/restore enabled */ -}}{{""}}

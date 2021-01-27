@@ -1,4 +1,4 @@
-{{ if eq .Values.vault.type "pvc" }}
+{{ if eq .Values.vault.type "nfs" }}
 
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -7,10 +7,10 @@ metadata:
 spec:
   accessModes:
     - ReadWriteMany
-  storageClassName: {{ $.Values.vault.pvc.storageClass }}
+  storageClassName: {{ $.Values.vault.nfs.storageClass }}
   resources:
     requests:
-      storage: {{ $.Values.vault.pvc.size }}
+      storage: {{ $.Values.vault.nfs.pvc_size }}
 
 ---
 {{- end }} {{- /* pvc */ -}}

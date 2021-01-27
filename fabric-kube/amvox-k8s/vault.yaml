@@ -1,0 +1,9 @@
+vault:
+  type: nfs
+
+  nfs:
+    storageClass: nfs
+    volumeName: shared-nfs-pv
+    claimName: shared-nfs-pvc
+    shared_dir: /opt/k8s-pods/data
+    pvc_size: 150Mi

@@ -1,0 +1,9 @@
+persistence:
+  enabled: true
+  storageClass: "standard"
+  size: 20Gi
+
+storageClass:
+  # Name of the storage class that will be managed by the provisioner
+  name: nfs
+  defaultClass: true

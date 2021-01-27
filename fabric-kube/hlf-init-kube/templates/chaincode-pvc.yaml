@@ -1,21 +1,18 @@
 {{ if eq .Values.vault.type "nfs" }}
-{{- range $i, $org := .Values.OrdererOrgs }}
-{{- range $i, $host := $org.Specs }}
+{{- range $i, $chaincode := $.Values.network.chaincodes }}
 
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: hlf-orderer--{{ $org.Name | lower }}--{{ $host.Hostname | lower }}
+  name: hlf-chaincode--{{ $chaincode.name | lower }}-pvc
 spec:
+{{/*  volumeName: {{ $.Values.vault.nfs.volumeName }}*/}}
   accessModes:
     - ReadWriteMany
   storageClassName: {{ $.Values.vault.nfs.storageClass }}
   resources:
     requests:
       storage: {{ $.Values.vault.nfs.pvc_size }}
-
 ---
-{{- end }} {{- /* hosts */ -}}
-{{- end }} {{- /* Orderers */ -}}
-{{- end }} {{- /* pvc */ -}}
-
+{{- end }} {{- /* network chaincodes */ -}}
+{{- end }}

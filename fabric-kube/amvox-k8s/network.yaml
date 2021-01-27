@@ -1,0 +1,29 @@
+tlsEnabled: true
+useActualDomains: true
+
+network:
+  # used by init script to create genesis block and by peer-org-flow to parse consortiums
+  genesisProfile: OrdererGenesis
+  # used by init script to create genesis block 
+  systemChannelID: system-channel
+
+  # defines which organizations will join to which channels
+  channels:
+    - name: amvoxChannel
+      # all peers in these organizations will join the channel
+      orgs: [Amvox, Org2, Org3]
+
+  # defines which chaincodes will be installed to which organizations
+  chaincodes:
+    - name: project-management
+      # if defined, this will override the global chaincode.version value
+      version: # "2.0" 
+      # chaincode will be installed to all peers in these organizations
+      orgs: [Amvox, Org2, Org3]
+      # at which channels are we instantiating/upgrading chaincode?
+      channels:
+      - name: amvoxChannel
+        # chaincode will be instantiated/upgraded using the first peer in the first organization
+        # chaincode will be invoked on all peers in these organizations
+        orgs: [Amvox, Org2, Org3]
+        policy: OR('AmvoxMSP.peer','Org2MSP.peer','Org3MSP.peer')

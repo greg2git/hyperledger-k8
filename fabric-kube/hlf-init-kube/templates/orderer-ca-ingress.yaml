@@ -2,7 +2,7 @@
 apiVersion: extensions/v1beta1
 kind: Ingress
 metadata:
-  name: hlf-ca--ingress
+  name: hlf-orderer-ca--ingress
   annotations:
     {{- range $key, $value := .Values.ingress.annotations }}
       {{ $key }}: {{ $value | quote }}
@@ -23,5 +23,5 @@ spec:
 {{- range $i, $org := .Values.OrdererOrgs }}
     - hlf-ca-{{ $org.Name | lower }}.{{ $.Values.ingress.parentDomain }}
 {{- end }}
-    secretName: hlf-ca--ingress-tls
+    secretName: hlf-orderer-ca--ingress-tls
 {{- end }} {{- /* if ingress.enabled */ -}}

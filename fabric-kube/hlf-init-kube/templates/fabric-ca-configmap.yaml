@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: hlf-fabric-ca-config
+data:
+  fabric-ca-server-config.yaml: |-
+    {{- .Files.Get "template_fabric-ca-orderer_node_ou-config.yaml" | indent 4 }}

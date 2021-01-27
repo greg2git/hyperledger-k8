@@ -1,0 +1,9 @@
+../bin/
+config/
+fabric-samples/
+crypto-config/
+channel-artifacts/
+
+
+#HLF binaries
+helm upgrade hlf-kube ./hlf-kube -f amvox-k8s/network.yaml -f amvox-k8s/crypto-config.yaml -f amvox-k8s/hostAliases.yaml

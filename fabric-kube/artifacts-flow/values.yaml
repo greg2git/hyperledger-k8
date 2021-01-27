@@ -5,14 +5,15 @@
 # number of times to retry a failed leaf task
 retryCount: 4
 
-hyperledgerVersion: 1.4.3
+hyperledgerVersion: 2.2.1
+FabricCaClientVersion: 1.4.9
 
 # see the Raft sample in the README for how to enable TLS
-tlsEnabled: false
+tlsEnabled: true
 
 # use actual domain names like peer0.atlantis.com instead of internal service names
 # this should be set to true for TLS
-useActualDomains: false
+useActualDomains: true
 logLevel: info
 adminCerts: true
 ca:

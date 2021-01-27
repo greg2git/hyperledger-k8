@@ -1,0 +1,36 @@
+# ---------------------------------------------------------------------------
+# Orderer
+# ---------------------------------------------------------------------------
+OrdererOrgs:
+  - Name: AmvoxDLT
+    Domain: amvox-dlt.io
+    Specs:
+      - Hostname: orderer0
+
+# ---------------------------------------------------------------------------
+# "PeerOrgs" - Definition of organizations managing peer nodes
+# ---------------------------------------------------------------------------
+PeerOrgs:
+  - Name: Amvox
+    Domain: amvox.io
+    EnableNodeOUs: true
+    Template:
+      Count: 1
+    Users:
+      Count: 0
+
+  - Name: Org2
+    Domain: org2.com
+    EnableNodeOUs: true
+    Template:
+      Count: 1
+    Users:
+      Count: 0
+
+  - Name: Org3
+    Domain: org3.com
+    EnableNodeOUs: true
+    Template:
+      Count: 1
+    Users:
+      Count: 0

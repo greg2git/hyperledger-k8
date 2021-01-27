@@ -1,0 +1,14 @@
+NodeOUs:
+  Enable: true
+  ClientOUIdentifier:
+    Certificate: cacerts/hlf-ca--amvoxdlt-7054-ca-AmvoxDLT.pem
+    OrganizationalUnitIdentifier: client
+  PeerOUIdentifier:
+    Certificate: cacerts/hlf-ca--amvoxdlt-7054-ca-AmvoxDLT.pem
+    OrganizationalUnitIdentifier: peer
+  AdminOUIdentifier:
+    Certificate: cacerts/hlf-ca--amvoxdlt-7054-ca-AmvoxDLT.pem
+    OrganizationalUnitIdentifier: admin
+  OrdererOUIdentifier:
+    Certificate: cacerts/hlf-ca--amvoxdlt-7054-ca-AmvoxDLT.pem
+    OrganizationalUnitIdentifier: orderer

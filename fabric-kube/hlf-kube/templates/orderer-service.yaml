@@ -7,6 +7,7 @@ metadata:
   name: hlf-orderer--{{ $org.Name | lower }}--{{ $host.Hostname | lower }}
   labels:
     name: hlf-orderer--{{ $org.Name | lower }}--{{ $host.Hostname | lower }}
+    component: hlf-orderer
     fqdn: {{ $host.Hostname }}.{{ $org.Domain }}
     addToHostAliases: "true"
 spec:
@@ -17,6 +18,17 @@ spec:
   - protocol: TCP
     port: 7050
     name: grpc
+  {{- if $.Values.orderer.cluster.enabled }}
+  - protocol: TCP
+    port: {{ $.Values.orderer.cluster.port }}
+    name: grpc-cluster
+  {{- end }}
+  # to verify
+  {{- if $.Values.orderer.operations.enabled }}
+  - protocol: TCP
+    port: {{ $.Values.orderer.operations.servicePort }}
+    name: operations
+  {{- end }}
 ---
 {{- end }} {{- /* org.Specs */ -}}
 {{- end }} {{- /* OrdererOrgs */ -}}

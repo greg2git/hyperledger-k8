@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: hlf-orderer-nodeou-config
+data:
+  config.yaml: |-
+    {{- $.Files.Get "orderer_node_ou-config.yaml" | indent 4 }}
