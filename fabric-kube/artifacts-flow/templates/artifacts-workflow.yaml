@@ -630,20 +630,20 @@ spec:
             cat {{ $ordererHome }}/tls/signcerts/cert.pem
             echo "------------------"
 
-{{/*            echo "NodeOUs:*/}}
-{{/*            Enable: true*/}}
-{{/*            ClientOUIdentifier:*/}}
-{{/*              Certificate: cacerts/hlf-ca--{{ $org.Name | lower }}-7054-ca-{{ $org.Name }}.pem*/}}
-{{/*              OrganizationalUnitIdentifier: client*/}}
-{{/*            PeerOUIdentifier:*/}}
-{{/*              Certificate: cacerts/hlf-ca--{{ $org.Name | lower }}-7054-ca-{{ $org.Name }}.pem*/}}
-{{/*              OrganizationalUnitIdentifier: peer*/}}
-{{/*            AdminOUIdentifier:*/}}
-{{/*              Certificate: cacerts/hlf-ca--{{ $org.Name | lower }}-7054-ca-{{ $org.Name }}.pem*/}}
-{{/*              OrganizationalUnitIdentifier: admin*/}}
-{{/*            OrdererOUIdentifier:*/}}
-{{/*              Certificate: cacerts/hlf-ca--{{ $org.Name | lower }}-7054-ca-{{ $org.Name }}.pem*/}}
-{{/*              OrganizationalUnitIdentifier: orderer" >> $ORDERER_GENERAL_LOCAL_MSP_DIR/orderer_node_ou-config.yaml*/}}
+            echo "NodeOUs:
+            Enable: true
+            ClientOUIdentifier:
+              Certificate: cacerts/hlf-ca--{{ $org.Name | lower }}-7054-ca-{{ $org.Name }}.pem
+              OrganizationalUnitIdentifier: client
+            PeerOUIdentifier:
+              Certificate: cacerts/hlf-ca--{{ $org.Name | lower }}-7054-ca-{{ $org.Name }}.pem
+              OrganizationalUnitIdentifier: peer
+            AdminOUIdentifier:
+              Certificate: cacerts/hlf-ca--{{ $org.Name | lower }}-7054-ca-{{ $org.Name }}.pem
+              OrganizationalUnitIdentifier: admin
+            OrdererOUIdentifier:
+              Certificate: cacerts/hlf-ca--{{ $org.Name | lower }}-7054-ca-{{ $org.Name }}.pem
+              OrganizationalUnitIdentifier: orderer" >> $ORDERER_GENERAL_LOCAL_MSP_DIR/orderer_node_ou-config.yaml
 
             echo "------"
             cat $ORDERER_GENERAL_LOCAL_MSP_DIR/config.yaml

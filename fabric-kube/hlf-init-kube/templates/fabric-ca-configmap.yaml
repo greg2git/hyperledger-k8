@@ -4,4 +4,4 @@ metadata:
   name: hlf-fabric-ca-config
 data:
   fabric-ca-server-config.yaml: |-
-    {{- .Files.Get "template_fabric-ca-orderer_node_ou-config.yaml" | indent 4 }}
+    {{- .Files.Get "template_fabric-ca-config.yaml" | indent 4 }}

@@ -28,7 +28,7 @@ find $FABRIC_CA_HOME
 #done
 #aff="${aff#\\n   }"
 #sed -i "/affiliations:/a \\   $aff" \
-#   $FABRIC_CA_HOME/fabric-ca-server-orderer_node_ou-config.yaml
+#   $FABRIC_CA_HOME/fabric-ca-server-config.yaml
 
 echo "Added extra affiliations..."
 

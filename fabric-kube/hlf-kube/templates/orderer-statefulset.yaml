@@ -33,11 +33,6 @@ spec:
         app: hlf-orderer--{{ $org.Name | lower }}--{{ $host.Hostname | lower }}
     spec:
       volumes:
-      - name: orderer-nodeou-config
-        configMap:
-          name: hlf-orderer-nodeou-config
-          defaultMode: 0777
-
       {{- if not $.Values.orderer.persistence.enabled }}
       - name: orderer-disk
         emptyDir: {}
@@ -174,7 +169,7 @@ spec:
       - name: orderer
         image: hyperledger/fabric-orderer:{{ $.Values.hyperledgerVersion }}
         workingDir: /opt/gopath/src/github.com/hyperledger/fabric
-        command: ["sh", "-c", "find /var/hyperledger/orderer/ && cp /var/hyperledger/orderer/nodeOU/config.yaml /var/hyperledger/orderer/msp/config.yaml && orderer"]
+        command: ["sh", "-c", "find /var/hyperledger/ && orderer"]
 
         volumeMounts:
         - mountPath: /var/hyperledger/production/orderer/
@@ -190,9 +185,6 @@ spec:
 
         - mountPath: /var/hyperledger/channel-artifacts
           name: channel-artifacts
-
-        - mountPath: /var/hyperledger/orderer/nodeOU
-          name: orderer-nodeou-config
 
         env:
         - name: FABRIC_LOGGING_SPEC
